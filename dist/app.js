@@ -1,46 +1,29 @@
-const STORAGE_KEY = "padelStats";
-const RESULTS_STORAGE_KEY = "padelResults";
-const EXTRA_MATCHES_STORAGE_KEY = "padelExtraMatches";
+const tauriInvoke = window.__TAURI__ && window.__TAURI__.core ? window.__TAURI__.core.invoke : null;
 
-function loadStats() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-  } catch {
-    return {};
-  }
+function dbGetMatches() {
+  return tauriInvoke("get_matches");
 }
 
-function saveStats(stats) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
+function dbAddMatch(newMatch) {
+  return tauriInvoke("add_match", { newMatch });
 }
 
-function loadResults() {
-  try {
-    return JSON.parse(localStorage.getItem(RESULTS_STORAGE_KEY)) || {};
-  } catch {
-    return {};
-  }
+function dbUpdateMatch(update) {
+  return tauriInvoke("update_match", { update });
 }
 
-function saveResults(results) {
-  localStorage.setItem(RESULTS_STORAGE_KEY, JSON.stringify(results));
+function dbUpdateResult(id, result) {
+  return tauriInvoke("update_match_result", { id, result });
 }
 
-function loadExtraMatches() {
-  try {
-    return JSON.parse(localStorage.getItem(EXTRA_MATCHES_STORAGE_KEY)) || [];
-  } catch {
-    return [];
-  }
+function dbUpdateStat(id, player, statKey, delta) {
+  return tauriInvoke("update_match_stat", { id, player, statKey, delta });
 }
 
-function saveExtraMatches(matches) {
-  localStorage.setItem(EXTRA_MATCHES_STORAGE_KEY, JSON.stringify(matches));
+function dbSeedMatches(scheduleMatches) {
+  return tauriInvoke("seed_matches", { matches: scheduleMatches });
 }
 
-let stats = loadStats();
-let results = loadResults();
-let extraMatches = loadExtraMatches();
 let activeView = "calendar";
 let scheduleSourceText = "";
 let selectedMobileDay = "";
@@ -55,7 +38,6 @@ function normalizeText(value) {
 function parseSchedule(text) {
   const matches = [];
   let currentDay = "";
-  const occurrences = {};
 
   text.split(/\r?\n/).forEach((rawLine) => {
     const line = rawLine.replace(/^\uFEFF/, "").trim();
@@ -109,35 +91,39 @@ function parseSchedule(text) {
       : normalizedCategory.includes("varones")
         ? "varones"
         : "fem";
-    const signature = `${currentDay}|${time}|${normalizeText(category)}|${players.map(normalizeText).join("|")}`;
-    occurrences[signature] = (occurrences[signature] || 0) + 1;
-    matches.push({
-      day: currentDay,
-      time,
-      category,
-      type,
-      players,
-      id: `${signature}|${occurrences[signature]}`,
-    });
+    matches.push({ day: currentDay, time, category, type, players });
   });
 
   return matches;
 }
 
+async function refreshMatches() {
+  MATCHES = (await dbGetMatches()) || [];
+  renderDayPanels();
+  renderMatches();
+  if (activeView === "pairs") renderPairsSummary();
+  if (activeView === "stats") renderStatsSummary();
+}
+
 async function loadSchedule() {
   const status = document.getElementById("schedule-status");
+  if (!tauriInvoke) {
+    status.textContent = "Esta función requiere ejecutar la app de escritorio.";
+    status.className = "schedule-status error";
+    return;
+  }
   try {
     const response = await fetch("./Horarios_Campeonato.txt", {
       cache: "no-store",
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const sourceText = await response.text();
-    if (sourceText === scheduleSourceText) return;
-    scheduleSourceText = sourceText;
-    MATCHES = [...parseSchedule(sourceText), ...extraMatches];
-    renderDayPanels();
-    renderMatches();
-    renderPairsSummary();
+    if (sourceText !== scheduleSourceText) {
+      scheduleSourceText = sourceText;
+      const scheduleMatches = parseSchedule(sourceText);
+      if (scheduleMatches.length) await dbSeedMatches(scheduleMatches);
+    }
+    await refreshMatches();
     status.className = "schedule-status loaded";
   } catch (error) {
     status.textContent = `Error al cargar horarios: ${error.message}`;
@@ -150,16 +136,12 @@ function pairName(match) {
   return match.players.join(" / ");
 }
 
-function statKey(matchId, player) {
-  return `${matchId}__${player}`;
-}
-
-function getPlayerStats(matchId, player) {
-  const key = statKey(matchId, player);
-  if (!stats[key]) {
-    stats[key] = Object.fromEntries(STAT_FIELDS.map((f) => [f.key, 0]));
+function getPlayerStats(match, player) {
+  if (!match.stats) match.stats = {};
+  if (!match.stats[player]) {
+    match.stats[player] = Object.fromEntries(STAT_FIELDS.map((f) => [f.key, 0]));
   }
-  return stats[key];
+  return match.stats[player];
 }
 
 function timeToMinutes(t) {
@@ -176,11 +158,22 @@ function getMatchType(category) {
       : "fem";
 }
 
-function selectOptions(values, placeholder) {
-  return [
-    `<option value="" disabled selected>${placeholder}</option>`,
-    ...values.map((value) => `<option value="${value}">${value}</option>`),
-  ].join("");
+const TOURNAMENT_INSTANCES = [
+  "Fase previa",
+  "Fase de grupos",
+  "Octavos de final",
+  "Cuartos de final",
+  "Semifinal",
+  "Final",
+];
+
+function optionsHtml(values, current, placeholder) {
+  const opts = values.map(
+    (value) =>
+      `<option value="${value}" ${value === current ? "selected" : ""}>${value}</option>`,
+  );
+  if (!current) opts.unshift(`<option value="" disabled selected>${placeholder}</option>`);
+  return opts.join("");
 }
 
 function buildAddMatchForm(day) {
@@ -191,25 +184,17 @@ function buildAddMatchForm(day) {
     ...new Set(MATCHES.map((match) => match.category)),
   ].sort();
   const pairs = [...new Set(MATCHES.map(pairName))].sort();
-  const instances = [
-    "Fase previa",
-    "Fase de grupos",
-    "Octavos de final",
-    "Cuartos de final",
-    "Semifinal",
-    "Final",
-  ];
   form.innerHTML = `
     <div class="add-match-title">Agregar partido</div>
     <div class="add-match-fields">
       <input name="time" type="time" aria-label="Hora" required>
-      <select name="category" aria-label="Categoría" required>${selectOptions(categories, "Categoría")}</select>
-      <select name="players" aria-label="Pareja" required>${selectOptions(pairs, "Pareja")}</select>
-      <select name="instance" aria-label="Instancia" required>${selectOptions(instances, "Instancia")}</select>
+      <select name="category" aria-label="Categoría" required>${optionsHtml(categories, "", "Categoría")}</select>
+      <select name="players" aria-label="Pareja" required>${optionsHtml(pairs, "", "Pareja")}</select>
+      <select name="instance" aria-label="Instancia" required>${optionsHtml(TOURNAMENT_INSTANCES, "", "Instancia")}</select>
       <button class="add-match-submit" type="submit">Agregar</button>
     </div>`;
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const formData = new FormData(form);
     const players = String(formData.get("players"))
@@ -218,21 +203,61 @@ function buildAddMatchForm(day) {
       .filter(Boolean);
     if (!players.length) return;
 
-    const match = {
+    const category = String(formData.get("category")).trim();
+    const newMatch = {
       day,
       time: String(formData.get("time")),
-      category: String(formData.get("category")).trim(),
-      type: getMatchType(String(formData.get("category"))),
+      category,
+      type: getMatchType(category),
       players,
-      instance: String(formData.get("instance")).trim(),
-      id: `manual-${Date.now()}`,
+      instance: String(formData.get("instance")).trim() || null,
     };
-    extraMatches.push(match);
-    saveExtraMatches(extraMatches);
-    MATCHES.push(match);
-    renderDayPanels();
-    renderMatches();
-    renderPairsSummary();
+    await dbAddMatch(newMatch);
+    form.reset();
+    await refreshMatches();
+  });
+
+  return form;
+}
+
+function buildMatchEditForm(match) {
+  const form = document.createElement("form");
+  form.className = "add-match-form edit-match-form hidden";
+  const days = [...new Set(MATCHES.map((m) => m.day))];
+  const categories = [...new Set(MATCHES.map((m) => m.category))].sort();
+  const pairs = [...new Set(MATCHES.map(pairName))].sort();
+  form.innerHTML = `
+    <div class="add-match-title">Editar partido</div>
+    <div class="add-match-fields">
+      <select name="day" aria-label="Día" required>${optionsHtml(days, match.day, "Día")}</select>
+      <input name="time" type="time" aria-label="Hora" value="${match.time}" required>
+      <select name="category" aria-label="Categoría" required>${optionsHtml(categories, match.category, "Categoría")}</select>
+      <select name="players" aria-label="Pareja" required>${optionsHtml(pairs, pairName(match), "Pareja")}</select>
+      <select name="instance" aria-label="Instancia" required>${optionsHtml(TOURNAMENT_INSTANCES, match.instance || "", "Instancia")}</select>
+      <button class="add-match-submit" type="submit">Guardar</button>
+    </div>`;
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const formData = new FormData(form);
+    const players = String(formData.get("players"))
+      .split(/\s*\/\s*|\s+y\s+/i)
+      .map((player) => player.trim())
+      .filter(Boolean);
+    if (!players.length) return;
+
+    const category = String(formData.get("category")).trim();
+    const update = {
+      id: match.id,
+      day: String(formData.get("day")),
+      time: String(formData.get("time")),
+      category,
+      type: getMatchType(category),
+      players,
+      instance: String(formData.get("instance")).trim() || null,
+    };
+    await dbUpdateMatch(update);
+    await refreshMatches();
   });
 
   return form;
@@ -323,6 +348,12 @@ function renderMatches() {
         header.appendChild(instance);
       }
 
+      const editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.className = "edit-match-toggle";
+      editButton.textContent = "✏️ Editar";
+      header.appendChild(editButton);
+
       const playersBlock = document.createElement("div");
       playersBlock.className = "match-players-block";
       match.players.forEach((player) => {
@@ -330,8 +361,13 @@ function renderMatches() {
       });
 
       const resultRow = buildResultRow(match);
+      const editForm = buildMatchEditForm(match);
+      editButton.addEventListener("click", () => {
+        const isHidden = editForm.classList.toggle("hidden");
+        editButton.textContent = isHidden ? "✏️ Editar" : "Ocultar edición";
+      });
 
-      card.append(header, playersBlock, resultRow);
+      card.append(header, playersBlock, resultRow, editForm);
       container.appendChild(card);
     });
   });
@@ -349,10 +385,10 @@ function buildResultRow(match) {
   input.type = "text";
   input.className = "result-input";
   input.placeholder = "ej: 6-3, 6-4";
-  input.value = results[match.id] || "";
+  input.value = match.result || "";
   input.addEventListener("change", () => {
-    results[match.id] = input.value.trim();
-    saveResults(results);
+    match.result = input.value.trim();
+    dbUpdateResult(match.id, match.result).catch((error) => console.error(error));
     if (activeView === "pairs") renderPairsSummary();
   });
 
@@ -361,7 +397,7 @@ function buildResultRow(match) {
 }
 
 function buildPlayerStatBlock(match, player) {
-  const playerStats = getPlayerStats(match.id, player);
+  const playerStats = getPlayerStats(match, player);
 
   const block = document.createElement("div");
   block.className = "player-inline-block";
@@ -403,7 +439,9 @@ function buildPlayerStatBlock(match, player) {
         (playerStats[field.key] || 0) + delta,
       );
       valueSpan.textContent = playerStats[field.key];
-      saveStats(stats);
+      dbUpdateStat(match.id, player, field.key, delta).catch((error) =>
+        console.error(error),
+      );
       if (activeView === "stats") renderStatsSummary();
     };
 
@@ -444,13 +482,14 @@ function renderStatsSummary() {
   const container = document.getElementById("stats-summary");
   const totals = {};
 
-  Object.entries(stats).forEach(([key, entry]) => {
-    const player = key.split("__")[1];
-    if (!totals[player]) {
-      totals[player] = Object.fromEntries(STAT_FIELDS.map((f) => [f.key, 0]));
-    }
-    STAT_FIELDS.forEach((field) => {
-      totals[player][field.key] += entry[field.key] || 0;
+  MATCHES.forEach((match) => {
+    Object.entries(match.stats || {}).forEach(([player, entry]) => {
+      if (!totals[player]) {
+        totals[player] = Object.fromEntries(STAT_FIELDS.map((f) => [f.key, 0]));
+      }
+      STAT_FIELDS.forEach((field) => {
+        totals[player][field.key] += entry[field.key] || 0;
+      });
     });
   });
 
@@ -507,7 +546,7 @@ function renderPairsSummary() {
       .forEach((match) => {
         const row = document.createElement("div");
         row.className = "pair-match-row";
-        const resultText = results[match.id] ? results[match.id] : "Sin cargar";
+        const resultText = match.result ? match.result : "Sin cargar";
         row.innerHTML = `
           <span class="pair-match-info">${match.day} ${match.time} · ${match.category}${match.instance ? ` · ${match.instance}` : ""}</span>
           <span class="pair-match-result">${resultText}</span>

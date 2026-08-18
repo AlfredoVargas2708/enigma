@@ -295,6 +295,28 @@ main {
   background: var(--gold);
 }
 
+.edit-match-toggle {
+  margin-left: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  background: white;
+  color: var(--navy);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.edit-match-toggle:hover {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
+.edit-match-form {
+  background: #f0f6ff;
+  border-color: var(--navy-light);
+}
+
 .add-match-form {
   margin: 4px 12px 14px;
   padding: 12px;
