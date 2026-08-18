@@ -651,4 +651,4 @@ document.querySelectorAll(".view-tab").forEach((btn) => {
 renderLegend();
 renderStatsLegend();
 loadSchedule();
-setInterval(loadSchedule, 5000);
+// setInterval(loadSchedule, 5000);
