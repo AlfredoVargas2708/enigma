@@ -1,5 +1,6 @@
 const STORAGE_KEY = "padelStats";
 const RESULTS_STORAGE_KEY = "padelResults";
+const EXTRA_MATCHES_STORAGE_KEY = "padelExtraMatches";
 
 function loadStats() {
   try {
@@ -25,8 +26,21 @@ function saveResults(results) {
   localStorage.setItem(RESULTS_STORAGE_KEY, JSON.stringify(results));
 }
 
+function loadExtraMatches() {
+  try {
+    return JSON.parse(localStorage.getItem(EXTRA_MATCHES_STORAGE_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveExtraMatches(matches) {
+  localStorage.setItem(EXTRA_MATCHES_STORAGE_KEY, JSON.stringify(matches));
+}
+
 let stats = loadStats();
 let results = loadResults();
+let extraMatches = loadExtraMatches();
 let activeView = "calendar";
 let scheduleSourceText = "";
 
@@ -109,7 +123,7 @@ async function loadSchedule() {
     const sourceText = await response.text();
     if (sourceText === scheduleSourceText) return;
     scheduleSourceText = sourceText;
-    MATCHES = parseSchedule(sourceText);
+    MATCHES = [...parseSchedule(sourceText), ...extraMatches];
     renderDayPanels();
     renderMatches();
     renderPairsSummary();
@@ -143,14 +157,79 @@ function timeToMinutes(t) {
   return h * 60 + m;
 }
 
+function getMatchType(category) {
+  const normalizedCategory = normalizeText(category);
+  return normalizedCategory.includes("mixto")
+    ? "mixto"
+    : normalizedCategory.includes("varones")
+      ? "varones"
+      : "fem";
+}
+
+function buildAddMatchForm(day) {
+  const form = document.createElement("form");
+  form.className = "add-match-form";
+  form.classList.add("hidden");
+  form.innerHTML = `
+    <div class="add-match-title">Agregar partido</div>
+    <div class="add-match-fields">
+      <input name="time" type="time" aria-label="Hora" required>
+      <input name="category" type="text" placeholder="Categoría" aria-label="Categoría" required>
+      <input name="players" type="text" placeholder="Pareja: Nombre / Nombre" aria-label="Pareja" required>
+      <input name="instance" type="text" placeholder="Instancia: Semifinal" aria-label="Instancia" required>
+      <button class="add-match-submit" type="submit">Agregar</button>
+    </div>`;
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const formData = new FormData(form);
+    const players = String(formData.get("players"))
+      .split(/\s*\/\s*|\s+y\s+/i)
+      .map((player) => player.trim())
+      .filter(Boolean);
+    if (!players.length) return;
+
+    const match = {
+      day,
+      time: String(formData.get("time")),
+      category: String(formData.get("category")).trim(),
+      type: getMatchType(String(formData.get("category"))),
+      players,
+      instance: String(formData.get("instance")).trim(),
+      id: `manual-${Date.now()}`,
+    };
+    extraMatches.push(match);
+    saveExtraMatches(extraMatches);
+    MATCHES.push(match);
+    renderDayPanels();
+    renderMatches();
+    renderPairsSummary();
+  });
+
+  return form;
+}
+
 function renderDayPanels() {
   const columns = document.querySelector(".day-columns");
-  const days = [...new Set(MATCHES.map((match) => match.day))];
+  const days = [...new Set([...MATCHES.map((match) => match.day), "Sábado", "Domingo"])];
   columns.innerHTML = "";
   days.forEach((day) => {
     const panel = document.createElement("div");
     panel.className = "day-panel";
     panel.innerHTML = `<div class="day-panel-header"><span class="cal-icon">📅</span> ${day.toUpperCase()}</div><div class="matches-container" data-day="${day}"></div>`;
+    if (day === "Sábado" || day === "Domingo") {
+      const addButton = document.createElement("button");
+      addButton.type = "button";
+      addButton.className = "add-match-toggle";
+      addButton.textContent = "Agregar partido";
+      const addForm = buildAddMatchForm(day);
+      addButton.addEventListener("click", () => {
+        const isHidden = addForm.classList.toggle("hidden");
+        addButton.textContent = isHidden ? "Agregar partido" : "Ocultar formulario";
+      });
+      panel.appendChild(addButton);
+      panel.appendChild(addForm);
+    }
     columns.appendChild(panel);
   });
 }
@@ -178,6 +257,12 @@ function renderMatches() {
       category.textContent = match.category;
 
       header.append(time, category);
+      if (match.instance) {
+        const instance = document.createElement("div");
+        instance.className = "match-instance";
+        instance.textContent = match.instance;
+        header.appendChild(instance);
+      }
 
       const playersBlock = document.createElement("div");
       playersBlock.className = "match-players-block";
@@ -361,7 +446,7 @@ function renderPairsSummary() {
         row.className = "pair-match-row";
         const resultText = results[match.id] ? results[match.id] : "Sin cargar";
         row.innerHTML = `
-          <span class="pair-match-info">${match.day} ${match.time} · ${match.category}</span>
+          <span class="pair-match-info">${match.day} ${match.time} · ${match.category}${match.instance ? ` · ${match.instance}` : ""}</span>
           <span class="pair-match-result">${resultText}</span>
         `;
         card.appendChild(row);

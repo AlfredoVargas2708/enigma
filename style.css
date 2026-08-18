@@ -233,6 +233,98 @@ main {
   background: var(--mixto);
 }
 
+.match-instance {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-style: italic;
+}
+
+.add-match-toggle {
+  align-self: flex-start;
+  margin: 8px 12px 4px;
+  border: 1px solid var(--gold);
+  border-radius: 6px;
+  padding: 7px 10px;
+  background: white;
+  color: var(--navy);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.add-match-toggle:hover {
+  background: var(--gold);
+}
+
+.add-match-form {
+  margin: 4px 12px 14px;
+  padding: 12px;
+  border: 1px dashed var(--gold);
+  border-radius: 10px;
+  background: #fffaf0;
+}
+
+.add-match-form.hidden {
+  display: none;
+}
+
+.add-match-title {
+  margin-bottom: 8px;
+  color: var(--navy);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.add-match-fields {
+  display: grid;
+  grid-template-columns: 90px 1fr 1.4fr 1fr auto;
+  gap: 6px;
+}
+
+.add-match-fields input {
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.76rem;
+}
+
+.add-match-fields input:focus {
+  outline: 2px solid var(--gold);
+  border-color: var(--gold);
+}
+
+.add-match-submit {
+  border: 0;
+  border-radius: 6px;
+  padding: 7px 10px;
+  background: var(--navy);
+  color: white;
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.add-match-submit:hover {
+  background: var(--gold);
+  color: var(--navy);
+}
+
+@media (max-width: 520px) {
+  .add-match-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .add-match-fields input:nth-child(3),
+  .add-match-fields input:nth-child(4),
+  .add-match-submit {
+    grid-column: 1 / -1;
+  }
+}
+
 .match-players-block {
   display: flex;
   flex-direction: column;
