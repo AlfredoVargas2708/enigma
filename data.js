@@ -15,4 +15,5 @@ const STAT_FIELDS = [
   { key: "forcedErrors", label: "Errores forzados", short: "EF" },
   { key: "aces", label: "Aces / Saques ganadores", short: "A" },
   { key: "doubleFaults", label: "Doble faltas", short: "DF" },
+  { key: "secondServe", label: "Segundo Saque", short: "SS" },
 ];
