@@ -17,7 +17,7 @@ async function dbGetMatches() {
   const { data, error } = await supabase
     .from("matches")
     .select("id, day, time, category, type, players, instance, result, stats")
-    .order("day", { ascending: true })
+    .order("day", { ascending: false })
     .order("time", { ascending: true });
   if (error) throw error;
   return data || [];
@@ -108,6 +108,20 @@ function normalizeText(value) {
     .toLowerCase();
 }
 
+function canonicalDay(value) {
+  const normalizedDay = normalizeText(String(value).trim());
+  const dayNames = {
+    viernes: "Viernes",
+    sabado: "Sábado",
+    domingo: "Domingo",
+    lunes: "Lunes",
+    martes: "Martes",
+    miercoles: "Miércoles",
+    jueves: "Jueves",
+  };
+  return dayNames[normalizedDay] || String(value).trim();
+}
+
 function parseSchedule(text) {
   const matches = [];
   let currentDay = "";
@@ -171,7 +185,10 @@ function parseSchedule(text) {
 }
 
 async function refreshMatches() {
-  MATCHES = (await dbGetMatches()) || [];
+  MATCHES = ((await dbGetMatches()) || []).map((match) => ({
+    ...match,
+    day: canonicalDay(match.day),
+  }));
   renderDayPanels();
   renderMatches();
   if (activeView === "pairs") renderPairsSummary();
@@ -181,16 +198,6 @@ async function refreshMatches() {
 async function loadSchedule() {
   const status = document.getElementById("schedule-status");
   try {
-    const response = await fetch("./Horarios_Campeonato.txt", {
-      cache: "no-store",
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const sourceText = await response.text();
-    if (sourceText !== scheduleSourceText) {
-      scheduleSourceText = sourceText;
-      const scheduleMatches = parseSchedule(sourceText);
-      if (scheduleMatches.length) await dbSeedMatches(scheduleMatches);
-    }
     await refreshMatches();
     status.className = "schedule-status loaded";
   } catch (error) {
@@ -226,6 +233,47 @@ function getMatchType(category) {
       : "fem";
 }
 
+function getTypeLabel(type) {
+  const labels = {
+    fem: "Femenino",
+    varones: "Masculino",
+    mixto: "Mixto",
+  };
+  const normalizedType = normalizeText(type);
+  const canonicalType = normalizedType.includes("mixto")
+    ? "mixto"
+    : normalizedType.includes("varon") || normalizedType.includes("mascul")
+      ? "varones"
+      : "fem";
+  return labels[canonicalType];
+}
+
+function getCanonicalType(type, category) {
+  const normalizedType = normalizeText(type);
+  if (normalizedType.includes("mixto")) return "mixto";
+  if (normalizedType.includes("varon") || normalizedType.includes("mascul")) {
+    return "varones";
+  }
+  if (normalizedType.includes("fem") || normalizedType.includes("femen")) {
+    return "fem";
+  }
+  return getMatchType(category);
+}
+
+function getCategoryDisplay(category, type) {
+  return `${category} · ${getTypeLabel(type)}`;
+}
+
+function categoryOptionsHtml(categories, current) {
+  const opts = categories.map((category) => {
+    const match = MATCHES.find((item) => item.category === category);
+    const type = getCanonicalType(match?.type, category);
+    return `<option value="${category}" ${category === current ? "selected" : ""}>${getCategoryDisplay(category, type)}</option>`;
+  });
+  if (!current) opts.unshift('<option value="" disabled selected>Categoría</option>');
+  return opts.join("");
+}
+
 const TOURNAMENT_INSTANCES = [
   "Fase previa",
   "Fase de grupos",
@@ -256,7 +304,7 @@ function buildAddMatchForm(day) {
     <div class="add-match-title">Agregar partido</div>
     <div class="add-match-fields">
       <input name="time" type="time" aria-label="Hora" required>
-      <select name="category" aria-label="Categoría" required>${optionsHtml(categories, "", "Categoría")}</select>
+      <select name="category" aria-label="Categoría" required>${categoryOptionsHtml(categories, "")}</select>
       <select name="players" aria-label="Pareja" required>${optionsHtml(pairs, "", "Pareja")}</select>
       <select name="instance" aria-label="Instancia" required>${optionsHtml(TOURNAMENT_INSTANCES, "", "Instancia")}</select>
       <button class="add-match-submit" type="submit">Agregar</button>
@@ -299,7 +347,7 @@ function buildMatchEditForm(match) {
     <div class="add-match-fields">
       <select name="day" aria-label="Día" required>${optionsHtml(days, match.day, "Día")}</select>
       <input name="time" type="time" aria-label="Hora" value="${match.time}" required>
-      <select name="category" aria-label="Categoría" required>${optionsHtml(categories, match.category, "Categoría")}</select>
+      <select name="category" aria-label="Categoría" required>${categoryOptionsHtml(categories, match.category)}</select>
       <select name="players" aria-label="Pareja" required>${optionsHtml(pairs, pairName(match), "Pareja")}</select>
       <select name="instance" aria-label="Instancia" required>${optionsHtml(TOURNAMENT_INSTANCES, match.instance || "", "Instancia")}</select>
       <button class="add-match-submit" type="submit">Guardar</button>
@@ -334,7 +382,7 @@ function buildMatchEditForm(match) {
 function renderDayPanels() {
   const columns = document.querySelector(".day-columns");
   const days = [
-    ...new Set([...MATCHES.map((match) => match.day), "Sábado", "Domingo"]),
+    ...new Set([...MATCHES.map((match) => canonicalDay(match.day)), "Sábado", "Domingo"]),
   ];
   if (!days.includes(selectedMobileDay)) selectedMobileDay = days[0] || "";
   columns.innerHTML = "";
@@ -405,8 +453,9 @@ function renderMatches() {
       time.innerHTML = `<span class="clock-icon">🕐</span> ${match.time}`;
 
       const category = document.createElement("div");
-      category.className = `match-category type-${match.type}`;
-      category.textContent = match.category;
+      const matchType = getCanonicalType(match.type, match.category);
+      category.className = `match-category type-${matchType}`;
+      category.textContent = getCategoryDisplay(match.category, matchType);
 
       header.append(time, category);
       if (match.instance) {
