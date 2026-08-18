@@ -28,6 +28,99 @@ function saveResults(results) {
 let stats = loadStats();
 let results = loadResults();
 let activeView = "calendar";
+let scheduleSourceText = "";
+
+function normalizeText(value) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function parseSchedule(text) {
+  const matches = [];
+  let currentDay = "";
+  const occurrences = {};
+
+  text.split(/\r?\n/).forEach((rawLine) => {
+    const line = rawLine.replace(/^\uFEFF/, "").trim();
+    if (!line) return;
+
+    const dayMatch = normalizeText(line).match(/^(viernes|sabado|domingo|lunes|martes|miercoles|jueves)$/);
+    if (dayMatch) {
+      currentDay = dayMatch[1].charAt(0).toUpperCase() + dayMatch[1].slice(1).toLowerCase();
+      if (normalizeText(currentDay) === "sabado") currentDay = "Sábado";
+      if (normalizeText(currentDay) === "miercoles") currentDay = "Miércoles";
+      return;
+    }
+
+    const matchLine = line.match(/^(\d{1,2}:\d{2})\s*-\s*(.+)$/);
+    if (!currentDay || !matchLine) return;
+
+    const time = matchLine[1].padStart(5, "0");
+    let details = matchLine[2].trim();
+    const categoryMatch = details.match(/^(.*?(?:mixto\s+open|varones|fem))\s*:?[ \t]*(.*)$/i);
+    let category;
+    let playersText;
+
+    if (categoryMatch) {
+      category = categoryMatch[1].trim();
+      playersText = categoryMatch[2].trim();
+    } else {
+      const shortCategoryMatch = details.match(/^((?:\d+)(?:ra|era|da|ta))\s*:?[ \t]*(.*)$/i);
+      if (!shortCategoryMatch) return;
+      category = `${shortCategoryMatch[1]} Fem`;
+      playersText = shortCategoryMatch[2].trim();
+    }
+
+    const players = playersText
+      .replace(/^\s*\/\s*/, "")
+      .split(/\s*\/\s*|\s+y\s+/i)
+      .map((player) => player.trim())
+      .filter(Boolean);
+    if (!players.length) return;
+
+    const normalizedCategory = normalizeText(category);
+    const type = normalizedCategory.includes("mixto")
+      ? "mixto"
+      : normalizedCategory.includes("varones")
+        ? "varones"
+        : "fem";
+    const signature = `${currentDay}|${time}|${normalizeText(category)}|${players.map(normalizeText).join("|")}`;
+    occurrences[signature] = (occurrences[signature] || 0) + 1;
+    matches.push({
+      day: currentDay,
+      time,
+      category,
+      type,
+      players,
+      id: `${signature}|${occurrences[signature]}`,
+    });
+  });
+
+  return matches;
+}
+
+async function loadSchedule() {
+  const status = document.getElementById("schedule-status");
+  try {
+    const response = await fetch("Horarios Campeonato.txt", { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const sourceText = await response.text();
+    if (sourceText === scheduleSourceText) return;
+    scheduleSourceText = sourceText;
+    MATCHES = parseSchedule(sourceText);
+    renderDayPanels();
+    renderMatches();
+    renderPairsSummary();
+    status.textContent = `Horarios cargados desde el TXT: ${MATCHES.length} partidos.`;
+    status.className = "schedule-status loaded";
+  } catch (error) {
+    status.textContent = "No se pudo leer el TXT. Abrí la app con un servidor local para cargar los horarios automáticamente.";
+    status.className = "schedule-status error";
+    console.error("No se pudo cargar Horarios Campeonato.txt", error);
+  }
+}
 
 function pairName(match) {
   return match.players.join(" / ");
@@ -48,6 +141,18 @@ function getPlayerStats(matchId, player) {
 function timeToMinutes(t) {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
+}
+
+function renderDayPanels() {
+  const columns = document.querySelector(".day-columns");
+  const days = [...new Set(MATCHES.map((match) => match.day))];
+  columns.innerHTML = "";
+  days.forEach((day) => {
+    const panel = document.createElement("div");
+    panel.className = "day-panel";
+    panel.innerHTML = `<div class="day-panel-header"><span class="cal-icon">📅</span> ${day.toUpperCase()}</div><div class="matches-container" data-day="${day}"></div>`;
+    columns.appendChild(panel);
+  });
 }
 
 function renderMatches() {
@@ -282,6 +387,7 @@ document.querySelectorAll(".view-tab").forEach((btn) => {
   btn.addEventListener("click", () => switchView(btn.dataset.view));
 });
 
-renderMatches();
 renderLegend();
 renderStatsLegend();
+loadSchedule();
+setInterval(loadSchedule, 5000);

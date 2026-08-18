@@ -117,6 +117,24 @@ main {
   padding: 8px 16px 24px;
 }
 
+.schedule-status {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--gold-light);
+  text-align: center;
+  font-size: 0.82rem;
+}
+
+.schedule-status.loaded {
+  color: #d9f99d;
+}
+
+.schedule-status.error {
+  color: #fecaca;
+}
+
 .view.hidden {
   display: none;
 }
