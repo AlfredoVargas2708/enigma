@@ -1,27 +1,100 @@
-const tauriInvoke = window.__TAURI__ && window.__TAURI__.core ? window.__TAURI__.core.invoke : null;
+const SUPABASE_URL = "https://sntovswinqyalxdctuci.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_IPiRXUSWK3hFfN5BePG1CA_NwGWC-hw";
 
-function dbGetMatches() {
-  return tauriInvoke("get_matches");
+let supabaseClientPromise = null;
+
+function getSupabaseClient() {
+  if (!supabaseClientPromise) {
+    supabaseClientPromise = import(
+      "https://esm.sh/@supabase/supabase-js@2"
+    ).then(({ createClient }) => createClient(SUPABASE_URL, SUPABASE_ANON_KEY));
+  }
+  return supabaseClientPromise;
 }
 
-function dbAddMatch(newMatch) {
-  return tauriInvoke("add_match", { newMatch });
+async function dbGetMatches() {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase
+    .from("matches")
+    .select("id, day, time, category, type, players, instance, result, stats")
+    .order("day", { ascending: true })
+    .order("time", { ascending: true });
+  if (error) throw error;
+  return data || [];
 }
 
-function dbUpdateMatch(update) {
-  return tauriInvoke("update_match", { update });
+async function dbAddMatch(newMatch) {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase
+    .from("matches")
+    .insert({
+      day: newMatch.day,
+      time: newMatch.time,
+      category: newMatch.category,
+      type: newMatch.type,
+      players: newMatch.players,
+      instance: newMatch.instance,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
-function dbUpdateResult(id, result) {
-  return tauriInvoke("update_match_result", { id, result });
+async function dbUpdateMatch(update) {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase
+    .from("matches")
+    .update({
+      day: update.day,
+      time: update.time,
+      category: update.category,
+      type: update.type,
+      players: update.players,
+      instance: update.instance,
+    })
+    .eq("id", update.id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
-function dbUpdateStat(id, player, statKey, delta) {
-  return tauriInvoke("update_match_stat", { id, player, statKey, delta });
+async function dbUpdateResult(id, result) {
+  const supabase = await getSupabaseClient();
+  const { error } = await supabase
+    .from("matches")
+    .update({ result: result || null })
+    .eq("id", id);
+  if (error) throw error;
 }
 
-function dbSeedMatches(scheduleMatches) {
-  return tauriInvoke("seed_matches", { matches: scheduleMatches });
+async function dbUpdateStat(id, player, statKey, delta) {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase.rpc("increment_match_stat", {
+    match_id: id,
+    player_name: player,
+    stat_key: statKey,
+    delta,
+  });
+  if (error) throw error;
+  return data;
+}
+
+async function dbSeedMatches(scheduleMatches) {
+  if (!scheduleMatches.length) return;
+  const supabase = await getSupabaseClient();
+  const rows = scheduleMatches.map((m) => ({
+    day: m.day,
+    time: m.time,
+    category: m.category,
+    type: m.type,
+    players: m.players,
+  }));
+  const { error } = await supabase
+    .from("matches")
+    .upsert(rows, { onConflict: "signature", ignoreDuplicates: true });
+  if (error) throw error;
 }
 
 let activeView = "calendar";
@@ -107,11 +180,6 @@ async function refreshMatches() {
 
 async function loadSchedule() {
   const status = document.getElementById("schedule-status");
-  if (!tauriInvoke) {
-    status.textContent = "Esta función requiere ejecutar la app de escritorio.";
-    status.className = "schedule-status error";
-    return;
-  }
   try {
     const response = await fetch("./Horarios_Campeonato.txt", {
       cache: "no-store",

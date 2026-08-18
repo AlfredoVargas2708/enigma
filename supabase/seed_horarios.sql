@@ -1,0 +1,41 @@
+-- Ejecutar en el SQL Editor de Supabase. Requiere que ya exista supabase/schema.sql aplicado.
+-- Usa ON CONFLICT (signature) DO NOTHING para no duplicar partidos ya sembrados por la app.
+
+insert into matches (day, time, category, type, players) values
+  ('Viernes', '16:00', '2da Varones', 'varones', '["Martín","Lauti"]'::jsonb),
+  ('Viernes', '17:15', '3ra Fem', 'fem', '["Fi","Chofa"]'::jsonb),
+  ('Viernes', '17:15', '4ta varones', 'varones', '["Cris","Juampi"]'::jsonb),
+  ('Viernes', '18:30', '3era Fem', 'fem', '["Isa","Caro"]'::jsonb),
+  ('Viernes', '19:45', 'Mixto Open', 'mixto', '["Flo","partner"]'::jsonb),
+  ('Viernes', '19:45', '1era Fem', 'fem', '["Fi","Chofa"]'::jsonb),
+  ('Viernes', '21:00', '1era Fem', 'fem', '["Isa","Caro"]'::jsonb),
+  ('Viernes', '21:00', '1era Fem', 'fem', '["Vale","Cata"]'::jsonb),
+  ('Viernes', '21:00', '2da Varones', 'varones', '["Martín","Lauti"]'::jsonb),
+  ('Viernes', '21:00', '6ta Varones', 'varones', '["Melliz","partner"]'::jsonb),
+  ('Viernes', '22:15', '3ra Varones', 'varones', '["Gonzalo","Dario"]'::jsonb),
+
+  ('Sábado', '09:00', '4ta Varones', 'varones', '["Joaco","Gabo"]'::jsonb),
+  ('Sábado', '09:00', '4ta fem', 'fem', '["Flopy","partner"]'::jsonb),
+  ('Sábado', '10:15', 'Mixto Open', 'mixto', '["Flo","partner"]'::jsonb),
+  ('Sábado', '10:15', '1era Fem', 'fem', '["Vale","Cata"]'::jsonb),
+  ('Sábado', '10:15', '5ta Varones', 'varones', '["Dario","Cristian"]'::jsonb),
+  ('Sábado', '11:00', '3ra Fem', 'fem', '["Fi","Chofa"]'::jsonb),
+  ('Sábado', '11:30', '2da Varones', 'varones', '["Gean","Diego"]'::jsonb),
+  ('Sábado', '11:30', '4ta Varones', 'varones', '["Alfredo","Agus"]'::jsonb),
+  ('Sábado', '12:45', '5ta Varones', 'varones', '["Dario","Cristian"]'::jsonb),
+  ('Sábado', '14:00', '3era Fem', 'fem', '["Isa","Caro"]'::jsonb),
+  ('Sábado', '14:00', '2da Varones', 'varones', '["Gean","Diego"]'::jsonb),
+  ('Sábado', '14:00', '1ra Fem', 'fem', '["Flo","Pame"]'::jsonb),
+  ('Sábado', '14:00', '1era Fem', 'fem', '["Fi","Chofa"]'::jsonb),
+  ('Sábado', '14:00', '4ta Varones', 'varones', '["Chris","Nacho"]'::jsonb),
+  ('Sábado', '14:00', '4ta Fem', 'fem', '["Flopy","partner"]'::jsonb),
+  ('Sábado', '15:15', '6ta Varones', 'varones', '["Melliz","partner"]'::jsonb),
+  ('Sábado', '16:30', '1era Fem', 'fem', '["Isa","Caro"]'::jsonb),
+  ('Sábado', '16:30', '3ra Varones', 'varones', '["Gonza","Mati"]'::jsonb),
+  ('Sábado', '16:20', '3ra Varones', 'varones', '["Gonzalo","Dario"]'::jsonb),
+  ('Sábado', '17:45', '4ta Varones', 'varones', '["Alfredo","Agus"]'::jsonb),
+  ('Sábado', '17:45', '4ta Varones', 'varones', '["Chris","Nacho"]'::jsonb),
+  ('Sábado', '17:45', '1ra Fem', 'fem', '["Flo","Pame"]'::jsonb),
+  ('Sábado', '17:45', '3ra Varones', 'varones', '["Gonza","Mati"]'::jsonb),
+  ('Sábado', '19:00', '4ta varones', 'varones', '["Cris","Juampi"]'::jsonb)
+on conflict (signature) do nothing;
