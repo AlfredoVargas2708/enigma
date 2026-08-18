@@ -43,6 +43,7 @@ let results = loadResults();
 let extraMatches = loadExtraMatches();
 let activeView = "calendar";
 let scheduleSourceText = "";
+let selectedMobileDay = "";
 
 function normalizeText(value) {
   return value
@@ -225,10 +226,12 @@ function buildAddMatchForm(day) {
 function renderDayPanels() {
   const columns = document.querySelector(".day-columns");
   const days = [...new Set([...MATCHES.map((match) => match.day), "Sábado", "Domingo"])];
+  if (!days.includes(selectedMobileDay)) selectedMobileDay = days[0] || "";
   columns.innerHTML = "";
   days.forEach((day) => {
     const panel = document.createElement("div");
     panel.className = "day-panel";
+    panel.dataset.day = day;
     panel.innerHTML = `<div class="day-panel-header"><span class="cal-icon">📅</span> ${day.toUpperCase()}</div><div class="matches-container" data-day="${day}"></div>`;
     if (day === "Sábado" || day === "Domingo") {
       const addButton = document.createElement("button");
@@ -245,6 +248,26 @@ function renderDayPanels() {
     }
     columns.appendChild(panel);
   });
+  renderMobileDayMenu(days);
+}
+
+function renderMobileDayMenu(days) {
+  const select = document.getElementById("mobile-day-select");
+  select.innerHTML = "";
+  days.forEach((day) => {
+    const option = document.createElement("option");
+    option.value = day;
+    option.textContent = day;
+    option.selected = day === selectedMobileDay;
+    select.appendChild(option);
+  });
+  select.onchange = () => {
+    selectedMobileDay = select.value;
+    document.querySelectorAll(".day-panel").forEach((panel) => {
+      panel.classList.toggle("mobile-day-hidden", panel.dataset.day !== selectedMobileDay);
+    });
+  };
+  select.dispatchEvent(new Event("change"));
 }
 
 function renderMatches() {

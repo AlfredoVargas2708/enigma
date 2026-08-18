@@ -147,9 +147,44 @@ main {
   gap: 20px;
 }
 
+.mobile-day-menu {
+  display: none;
+}
+
 @media (max-width: 720px) {
   .day-columns {
     grid-template-columns: 1fr;
+  }
+
+  .mobile-day-menu {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: white;
+  }
+
+  .mobile-day-menu label {
+    color: var(--navy);
+    font-size: 0.85rem;
+    font-weight: 800;
+  }
+
+  .mobile-day-menu select {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: white;
+    color: var(--navy);
+    font: inherit;
+  }
+
+  .day-panel.mobile-day-hidden {
+    display: none;
   }
 }
 
