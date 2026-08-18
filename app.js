@@ -127,7 +127,6 @@ async function loadSchedule() {
     renderDayPanels();
     renderMatches();
     renderPairsSummary();
-    status.textContent = `Horarios cargados desde el TXT: ${MATCHES.length} partidos.`;
     status.className = "schedule-status loaded";
   } catch (error) {
     status.textContent = "No se pudo leer el TXT. Abrí la app con un servidor local para cargar los horarios automáticamente.";
@@ -166,17 +165,31 @@ function getMatchType(category) {
       : "fem";
 }
 
+function selectOptions(values, placeholder) {
+  return [`<option value="" disabled selected>${placeholder}</option>`, ...values.map((value) => `<option value="${value}">${value}</option>`)].join("");
+}
+
 function buildAddMatchForm(day) {
   const form = document.createElement("form");
   form.className = "add-match-form";
   form.classList.add("hidden");
+  const categories = [...new Set(MATCHES.map((match) => match.category))].sort();
+  const pairs = [...new Set(MATCHES.map(pairName))].sort();
+  const instances = [
+    "Fase previa",
+    "Fase de grupos",
+    "Octavos de final",
+    "Cuartos de final",
+    "Semifinal",
+    "Final",
+  ];
   form.innerHTML = `
     <div class="add-match-title">Agregar partido</div>
     <div class="add-match-fields">
       <input name="time" type="time" aria-label="Hora" required>
-      <input name="category" type="text" placeholder="Categoría" aria-label="Categoría" required>
-      <input name="players" type="text" placeholder="Pareja: Nombre / Nombre" aria-label="Pareja" required>
-      <input name="instance" type="text" placeholder="Instancia: Semifinal" aria-label="Instancia" required>
+      <select name="category" aria-label="Categoría" required>${selectOptions(categories, "Categoría")}</select>
+      <select name="players" aria-label="Pareja" required>${selectOptions(pairs, "Pareja")}</select>
+      <select name="instance" aria-label="Instancia" required>${selectOptions(instances, "Instancia")}</select>
       <button class="add-match-submit" type="submit">Agregar</button>
     </div>`;
 
