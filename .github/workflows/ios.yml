@@ -36,6 +36,4 @@ jobs:
       - name: Initialize iOS project
         run: npx tauri ios init
       - name: Build iOS simulator app
-        env:
-          APPLE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_DEVELOPMENT_TEAM }}
-        run: npx tauri ios build -- --simulator
+        run: npx tauri ios build --target aarch64-sim -- CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
