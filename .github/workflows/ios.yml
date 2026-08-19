@@ -24,7 +24,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios-sim,x86_64-apple-ios
+          targets: aarch64-apple-ios-sim
       - name: Install CocoaPods
         run: |
           if ! command -v pod >/dev/null; then
