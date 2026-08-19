@@ -1,6 +1,7 @@
-name: iOS workflow
+name: iOS Simulator
 
 on:
+  workflow_dispatch:
   push:
     branches: ["main"]
   pull_request:
@@ -11,29 +12,52 @@ permissions:
 
 jobs:
   build:
-    name: Build Tauri iOS app using an available iPhone simulator
+    name: Build Tauri iOS Simulator
     runs-on: macos-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+
       - name: Install dependencies
         run: npm ci
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-ios-sim
+
       - name: Install CocoaPods
         run: |
-          if ! command -v pod >/dev/null; then
+          if ! command -v pod >/dev/null 2>&1; then
             brew install cocoapods
           fi
+
       - name: Initialize iOS project
         run: npx tauri ios init
-      - name: Build iOS simulator app
-        run: npx tauri ios build --target aarch64-sim -- CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+
+      - name: Build iOS Simulator
+        run: |
+          npx tauri ios build --target aarch64-sim -- \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Find generated app
+        run: |
+          echo "=== Generated iOS files ==="
+          find src-tauri/gen/apple -type d -name "*.app" -print || true
+
+      - name: Upload simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: enigma-ios-simulator
+          path: |
+            src-tauri/gen/apple/**/*.app
+          if-no-files-found: warn
