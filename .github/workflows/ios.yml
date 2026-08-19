@@ -2,9 +2,9 @@ name: iOS workflow
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 permissions:
   contents: read
@@ -36,5 +36,6 @@ jobs:
       - name: Initialize iOS project
         run: npx tauri ios init
       - name: Build iOS simulator app
-        run: |
-          npx tauri ios build -- --simulator
+        env:
+          APPLE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_DEVELOPMENT_TEAM }}
+        run: npx tauri ios build -- --simulator
