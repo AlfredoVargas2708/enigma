@@ -42,17 +42,39 @@ jobs:
       - name: Initialize iOS project
         run: npx tauri ios init
 
-      - name: Build iOS Simulator
+      - name: Build Rust for iOS Simulator
         run: |
-          npx tauri ios build --target aarch64-sim -- \
+          cd src-tauri
+          cargo build \
+            --target aarch64-apple-ios-sim \
+            --release
+
+      - name: Find iOS project
+        run: |
+          find src-tauri/gen/apple \
+            \( -name "*.xcodeproj" -o -name "*.xcworkspace" \) \
+            -print
+
+      - name: Build iOS Simulator with Xcode
+        run: |
+          xcodebuild \
+            -project src-tauri/gen/apple/app.xcodeproj \
+            -scheme app_iOS \
+            -sdk iphonesimulator \
+            -configuration release \
+            -destination 'generic/platform=iOS Simulator' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            build
 
       - name: Find generated app
         run: |
-          echo "=== Generated iOS files ==="
-          find src-tauri/gen/apple -type d -name "*.app" -print || true
+          echo "=== Generated apps ==="
+          find src-tauri/gen/apple \
+            -type d \
+            -name "*.app" \
+            -print || true
 
       - name: Upload simulator app
         uses: actions/upload-artifact@v4
