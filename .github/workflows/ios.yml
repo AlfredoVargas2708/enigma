@@ -37,4 +37,4 @@ jobs:
         run: npx tauri ios init
       - name: Build iOS simulator app
         run: |
-          npx tauri ios build --simulator
+          npx tauri ios build -- --simulator
