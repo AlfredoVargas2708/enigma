@@ -1,4 +1,4 @@
-name: iOS Simulator
+name: iOS Build
 
 on:
   workflow_dispatch:
@@ -11,8 +11,8 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build Tauri iOS Simulator
+  build-ios:
+    name: Build Tauri iOS
     runs-on: macos-latest
 
     steps:
@@ -39,44 +39,18 @@ jobs:
             brew install cocoapods
           fi
 
-      - name: Initialize iOS project
+      - name: Initialize iOS
         run: npx tauri ios init
 
-      - name: Build Rust for iOS Simulator
-        run: |
-          cd src-tauri
-          cargo build \
-            --target aarch64-apple-ios-sim \
-            --release
+      - name: Build iOS Simulator
+        run: npx tauri ios build --target aarch64-sim
 
-      - name: Find iOS project
+      - name: Find generated application
         run: |
-          find src-tauri/gen/apple \
-            \( -name "*.xcodeproj" -o -name "*.xcworkspace" \) \
-            -print
+          echo "Generated files:"
+          find src-tauri/gen/apple -type d -name "*.app" -print || true
 
-      - name: Build iOS Simulator with Xcode
-        run: |
-          xcodebuild \
-            -project src-tauri/gen/apple/app.xcodeproj \
-            -scheme app_iOS \
-            -sdk iphonesimulator \
-            -configuration release \
-            -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            build
-
-      - name: Find generated app
-        run: |
-          echo "=== Generated apps ==="
-          find src-tauri/gen/apple \
-            -type d \
-            -name "*.app" \
-            -print || true
-
-      - name: Upload simulator app
+      - name: Upload iOS application
         uses: actions/upload-artifact@v4
         with:
           name: enigma-ios-simulator
