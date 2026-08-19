@@ -36,4 +36,4 @@ jobs:
       - name: Initialize iOS project
         run: npx tauri ios init
       - name: Build iOS simulator app
-        run: npx tauri ios build --simulator -- CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+        run: npx tauri ios build --target aarch64-sim -- CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
