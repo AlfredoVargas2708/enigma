@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Partidos Enigma",
   "version": "0.1.0",
-  "identifier": "com.partidosenigma.desktop",
+  "identifier": "com.partidosenigma.app",
 
   "build": {
     "devUrl": null,
